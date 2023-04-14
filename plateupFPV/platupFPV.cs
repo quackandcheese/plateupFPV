@@ -19,8 +19,14 @@ namespace plateupFPV
 {
     public class SetFPV : GenericSystemBase, IModSystem
     {
+        private const string ITEM_HOLDPOINT_PATH = "MorphmanPlus/Hold Points/Item Hold Point";
+        
         bool isFPV = false;
         bool isPopup = false;
+        bool isInitialised = false;
+
+        GameObject player;
+
         InputAction f1Action;
         InputAction lftStick;
         InputAction rgtStick;
@@ -31,6 +37,12 @@ namespace plateupFPV
         InputAction mouseMoveAction;
         Camera fpvCamera;
         Camera topDownCamera;
+
+        Material originalSkybox;
+        Material skyboxMaterial;
+
+        Vector3 originalHoldPointLocalPosition;
+
         List<InputAction> movementAndLookActions = new List<InputAction>();
 
         protected override void Initialise()
@@ -42,43 +54,65 @@ namespace plateupFPV
                     movementAndLookActions.Add(action);
                 }
             }
-            f1Action = new InputAction("f1", binding: "<Keyboard>/f1");
+            f1Action = new InputAction("f3", binding: "<Keyboard>/f3");
             f1Action.performed += ctx =>
             {
                 if (!isFPV)
                 {
-                    enableFPV();
+                    EnableFPV();
                     isFPV = true;
                 }
                 else
                 {
-                    disableFPV();
+                    DisableFPV();
                     isFPV = false;
                 }
             };
             f1Action.Enable();
         }
-        void enableFPV()
+        private void EnableFPV()
         {
-            GameObject player = GameObject.Find("Player(Clone)");
-            GameObject cameraObject = new GameObject("FPV Camera");
-            fpvCamera = cameraObject.AddComponent<Camera>();
-            fpvCamera.transform.localPosition = new Vector3(0, 1f, 0);
-            fpvCamera.transform.parent = player.transform;
-            fpvCamera.transform.localRotation = Quaternion.Euler(0, 0, 0);
-            Vector3 pos = new Vector3(player.transform.position.x, player.transform.position.y + 1f, player.transform.position.z);
-            fpvCamera.transform.SetPositionAndRotation(pos, player.transform.rotation);
-            fpvCamera.fieldOfView = 75;
-            fpvCamera.nearClipPlane = 0.3f;
-            fpvCamera.clearFlags = CameraClearFlags.Skybox;
-            fpvCamera.backgroundColor = new Color(0.5f, 0.5f, 1f);
-            fpvCamera.farClipPlane = 3000f;
-            Material skyboxMaterial = new Material(Shader.Find("Skybox/Procedural"));
-            skyboxMaterial.SetColor("_SkyTint", new Color(0.5f, 0.5f, 1f));
-            skyboxMaterial.SetFloat("_SunSize", 0.04f);
-            skyboxMaterial.SetFloat("_AtmosphereThickness", 1f);
-            skyboxMaterial = Resources.Load<Material>("Skybox/Blue Sky");
+            player = GameObject.Find("Player(Clone)");
+
+            if (!isInitialised)
+            {
+                isInitialised = true;
+
+                GameObject cameraObject = new GameObject("FPV Camera");
+                fpvCamera = cameraObject.AddComponent<Camera>();
+                fpvCamera.transform.localPosition = new Vector3(0, 1f, 0);
+                fpvCamera.transform.parent = player.transform;
+                fpvCamera.transform.localRotation = Quaternion.Euler(0, 0, 0);
+                Vector3 pos = new Vector3(player.transform.position.x, player.transform.position.y + 1f, player.transform.position.z);
+                fpvCamera.transform.SetPositionAndRotation(pos, player.transform.rotation);
+                fpvCamera.fieldOfView = 75;
+                fpvCamera.nearClipPlane = 0.3f;
+                fpvCamera.clearFlags = CameraClearFlags.Skybox;
+                fpvCamera.backgroundColor = new Color(0.5f, 0.5f, 1f);
+                fpvCamera.farClipPlane = 3000f;
+
+                skyboxMaterial = new Material(Shader.Find("Skybox/Procedural"));
+                skyboxMaterial.SetColor("_SkyTint", new Color(0.5f, 0.5f, 1f));
+                skyboxMaterial.SetFloat("_SunSize", 0.04f);
+                skyboxMaterial.SetFloat("_AtmosphereThickness", 1f);
+                skyboxMaterial = Resources.Load<Material>("Skybox/Blue Sky");
+
+                originalSkybox = RenderSettings.skybox;
+                originalHoldPointLocalPosition = player.transform.Find(ITEM_HOLDPOINT_PATH).localPosition;
+
+                wAction = new InputAction("w", binding: "<Keyboard>/w");
+                aAction = new InputAction("a", binding: "<Keyboard>/a");
+                sAction = new InputAction("s", binding: "<Keyboard>/s");
+                dAction = new InputAction("d", binding: "<Keyboard>/d");
+
+                mouseMoveAction = new InputAction("MouseMove", binding: "<Mouse>/delta");
+                lftStick = new InputAction("LeftStick", binding: "<Gamepad>/leftStick");
+                rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
+            }
+
+            fpvCamera.enabled = true;
             RenderSettings.skybox = skyboxMaterial;
+
             topDownCamera = Camera.main;
             topDownCamera.transform.localPosition = new Vector3(0, 10f, 0);
             topDownCamera.transform.localRotation = Quaternion.Euler(90, 0, 0);
@@ -92,44 +126,54 @@ namespace plateupFPV
             topDownCamera.backgroundColor = new Color(0.5f, 0.5f, 1f);
             topDownCamera.farClipPlane = 3000f;
             topDownCamera.depth = 1;
+
+
             foreach (var action in movementAndLookActions)
             {
                 action.Disable();
             }
-            wAction = new InputAction("w", binding: "<Keyboard>/w");
+            
             wAction.Enable();
-            aAction = new InputAction("a", binding: "<Keyboard>/a");
             aAction.Enable();
-            sAction = new InputAction("s", binding: "<Keyboard>/s");
             sAction.Enable();
-            dAction = new InputAction("d", binding: "<Keyboard>/d");
             dAction.Enable();
-            mouseMoveAction = new InputAction("MouseMove", binding: "<Mouse>/delta");
+            
             mouseMoveAction.Enable();
-            lftStick = new InputAction("LeftStick", binding: "<Gamepad>/leftStick");
             lftStick.Enable();
-            rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
             rgtStick.Enable();
+
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+
+            Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
+            player.transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointPosition;
         }
 
-        void disableFPV()
+        private void DisableFPV()
         {
-            topDownCamera.rect = new Rect(0, 0, 1, 1);
-            fpvCamera.enabled = false;
-            wAction.Disable();
-            aAction.Disable();
-            sAction.Disable();
-            dAction.Disable();
-            mouseMoveAction.Disable();
-            lftStick.Disable();
-            foreach (var action in movementAndLookActions)
+            if (isInitialised)
             {
-                action.Enable();
+                topDownCamera.rect = new Rect(0, 0, 1, 1);
+                fpvCamera.enabled = false;
+                wAction.Disable();
+                aAction.Disable();
+                sAction.Disable();
+                dAction.Disable();
+                mouseMoveAction.Disable();
+                lftStick.Disable();
+
+                RenderSettings.skybox = originalSkybox;
+
+                foreach (var action in movementAndLookActions)
+                {
+                    action.Enable();
+                }
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+
+
+                player.transform.Find(ITEM_HOLDPOINT_PATH).localPosition = originalHoldPointLocalPosition;
             }
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
         }
         
 
@@ -190,7 +234,7 @@ namespace plateupFPV
             if (pause.transform.GetChild(0).gameObject.activeSelf)
             {
                 isPopup = true;
-                disableFPV();
+                DisableFPV();
 
             }
             else
@@ -201,7 +245,7 @@ namespace plateupFPV
             {
                 if (topDownCamera.rect == new Rect(0, 0, 1, 1))
                 {
-                    enableFPV();
+                    EnableFPV();
                 }
             }
         }
