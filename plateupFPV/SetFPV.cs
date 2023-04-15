@@ -15,7 +15,7 @@ using Controllers;
 using Kitchen.Layouts.Modules;
 using Kitchen.Components;
 
-namespace plateupFPV
+namespace FirstPersonView
 {
     public class SetFPV : GenericSystemBase, IModSystem
     {
@@ -24,6 +24,9 @@ namespace plateupFPV
         bool isFPV = false;
         bool isPopup = false;
         bool isInitialised = false;
+
+        private float lookUpMax = 45f;
+        private float lookUpMin = -45f;
 
         GameObject player;
 
@@ -34,7 +37,8 @@ namespace plateupFPV
         InputAction aAction;
         InputAction sAction;
         InputAction dAction;
-        InputAction mouseMoveAction;
+        InputAction moveAction;
+        InputAction lookAction;
         Camera fpvCamera;
         Camera topDownCamera;
 
@@ -105,8 +109,18 @@ namespace plateupFPV
                 sAction = new InputAction("s", binding: "<Keyboard>/s");
                 dAction = new InputAction("d", binding: "<Keyboard>/d");
 
-                mouseMoveAction = new InputAction("MouseMove", binding: "<Mouse>/delta");
-                lftStick = new InputAction("LeftStick", binding: "<Gamepad>/leftStick");
+
+
+                moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "stickDeadzone(min=0.125,max=0.925)");
+                moveAction.AddCompositeBinding("Dpad")
+                    .With("Up", "<Keyboard>/w")
+                    .With("Down", "<Keyboard>/s")
+                    .With("Left", "<Keyboard>/a")
+                    .With("Right", "<Keyboard>/d");
+
+
+                lookAction = new InputAction("look", binding: "<Mouse>/delta");
+                
                 rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
             }
 
@@ -133,13 +147,8 @@ namespace plateupFPV
                 action.Disable();
             }
             
-            wAction.Enable();
-            aAction.Enable();
-            sAction.Enable();
-            dAction.Enable();
-            
-            mouseMoveAction.Enable();
-            lftStick.Enable();
+            moveAction.Enable();
+            lookAction.Enable();
             rgtStick.Enable();
 
             Cursor.lockState = CursorLockMode.Locked;
@@ -155,12 +164,10 @@ namespace plateupFPV
             {
                 topDownCamera.rect = new Rect(0, 0, 1, 1);
                 fpvCamera.enabled = false;
-                wAction.Disable();
-                aAction.Disable();
-                sAction.Disable();
-                dAction.Disable();
-                mouseMoveAction.Disable();
-                lftStick.Disable();
+                
+                moveAction.Disable();
+                lookAction.Disable();
+                rgtStick.Disable();
 
                 RenderSettings.skybox = originalSkybox;
 
@@ -176,28 +183,23 @@ namespace plateupFPV
             }
         }
         
+        private Vector3 GetMovementVector()
+        {
+            Vector2 movementDir = moveAction.ReadValue<Vector2>();
+
+
+            return movementDir.normalized;
+        }
 
         protected override void OnUpdate()
         {
             if (fpvCamera != null)
             {
-                GameObject player = GameObject.Find("Player(Clone)");
-                if (lftStick.ReadValue<Vector2>().y > 0.1f)
-                {
-                    player.transform.Translate(Vector3.forward * 0.05f);
-                }
-                if (lftStick.ReadValue<Vector2>().y < -0.1f)
-                {
-                    player.transform.Translate(Vector3.back * 0.05f);
-                }
-                if (lftStick.ReadValue<Vector2>().x > 0.1f)
-                {
-                    player.transform.Translate(Vector3.right * 0.025f);
-                }
-                if (lftStick.ReadValue<Vector2>().x < -0.1f)
-                {
-                    player.transform.Translate(Vector3.left * 0.025f);
-                }
+                float moveSpeed = 60f;
+                Vector2 movementDir = GetMovementVector();
+                Vector3 move = player.transform.right * movementDir.x + player.transform.forward * movementDir.y;
+                player.GetComponent<Rigidbody>().AddForce(move * moveSpeed * UnityEngine.Time.deltaTime, ForceMode.VelocityChange);
+
                 if (rgtStick.ReadValue<Vector2>().x != 0 || rgtStick.ReadValue<Vector2>().y != 0)
                 {
                     float x = rgtStick.ReadValue<Vector2>().x * 2f;
@@ -205,29 +207,23 @@ namespace plateupFPV
                     player.transform.Rotate(new Vector3(0, x, 0));
                     fpvCamera.transform.Rotate(new Vector3(y, 0, 0));
                 }
-                if (wAction.ReadValue<float>() > 0)
-                {
-                    player.transform.position += player.transform.forward * 0.05f;
-                }
-                if (aAction.ReadValue<float>() > 0)
-                {
-                    player.transform.position -= player.transform.right * 0.033f;
 
-                }
-                if (sAction.ReadValue<float>() > 0)
-                {
-                    player.transform.position -= player.transform.forward * 0.05f;
-                }
-                if (dAction.ReadValue<float>() > 0)
-                {
-
-                    player.transform.position += player.transform.right * 0.033f;
-                }
-                Vector2 mouseMove = mouseMoveAction.ReadValue<Vector2>();
+                Vector2 mouseMove = lookAction.ReadValue<Vector2>();
                 float mouseX = mouseMove.x / 4;
                 float mouseY = (mouseMove.y / 8) * -1;
+
+
                 player.transform.Rotate(new Vector3(0, mouseX, 0));
+
+                /*float xRot = fpvCamera.transform.localEulerAngles.x;
+
+                xRot += mouseY;
+
+                xRot = Mathf.Clamp(xRot, lookUpMin, lookUpMax);
+
+                fpvCamera.transform.localRotation = Quaternion.Euler(xRot, 0f, 0f);*/
                 fpvCamera.transform.Rotate(new Vector3(mouseY, 0, 0));
+
             }
             GameObject generic = GameObject.Find("Generic Choice Popup(Clone)");
             GameObject pause = GameObject.Find("Player Pause Popup");
