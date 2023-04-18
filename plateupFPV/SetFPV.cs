@@ -1,4 +1,4 @@
-﻿using Kitchen;
+﻿/*using Kitchen;
 using KitchenMods;
 using Unity.Collections;
 using Unity.Entities;
@@ -215,13 +215,6 @@ namespace FirstPersonView
 
                 player.transform.Rotate(new Vector3(0, mouseX, 0));
 
-                /*float xRot = fpvCamera.transform.localEulerAngles.x;
-
-                xRot += mouseY;
-
-                xRot = Mathf.Clamp(xRot, lookUpMin, lookUpMax);
-
-                fpvCamera.transform.localRotation = Quaternion.Euler(xRot, 0f, 0f);*/
                 fpvCamera.transform.Rotate(new Vector3(mouseY, 0, 0));
 
             }
@@ -247,3 +240,4 @@ namespace FirstPersonView
         }
     }
 }
+*/

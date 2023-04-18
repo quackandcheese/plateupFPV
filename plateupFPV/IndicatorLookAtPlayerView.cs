@@ -1,4 +1,4 @@
-﻿using FirstPersonView;
+﻿using KitchenFirstPersonView;
 using Kitchen;
 using KitchenMods;
 using MessagePack;
@@ -14,7 +14,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-namespace KitchenFirstPersonView
+namespace KitchenFirstPersonView 
 {
     public class IndicatorLookAtPlayerView : UpdatableObjectView<IndicatorLookAtPlayerView.MyViewData>
     {

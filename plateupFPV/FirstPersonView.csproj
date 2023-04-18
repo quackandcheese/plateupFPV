@@ -15,7 +15,7 @@
 		<!-- ASSET BUNDLES -->
 
 		<!-- Set the next line to 'true' if you have an asset bundle -->
-		<EnableAssetBundleDeploy>false</EnableAssetBundleDeploy>
+		<EnableAssetBundleDeploy>true</EnableAssetBundleDeploy>
 		<!-- Change this if your mod.assets is located elsewhere than the default location -->
 		<AssetBundlePath>$(ProjectDir)content\mod.assets</AssetBundlePath>
 		<RootNamespace>Kitchen$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
