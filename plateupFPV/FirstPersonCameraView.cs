@@ -35,12 +35,10 @@ namespace KitchenFirstPersonView
             {
                 base.Initialise();
 
-                // Cache Entity Queries
-                // This should contain ALL IComponentData that will be used in the class
                 Query = GetEntityQuery(typeof(CLinkedView), typeof(CFirstPersonPlayer));
 
 
-                toggleCameraKey = Keyboard.current.f5Key;
+                //toggleCameraKey = Keyboard.current.f5Key;
             }
 
             protected override void OnUpdate()
@@ -51,13 +49,12 @@ namespace KitchenFirstPersonView
                 using NativeArray<CFirstPersonPlayer> components = Query.ToComponentDataArray<CFirstPersonPlayer>(Allocator.Temp);
                 using var ents = Query.ToEntityArray(Allocator.Temp);
 
-
-                for (var i = 0; i < ents.Length; i++)
+                //  ***************MOVED TO VIEWDATA
+                /*for (var i = 0; i < ents.Length; i++)
                 {
                     var ent = ents[i];
                     var my_component = components[i];
 
-                    //TODO: check if player is local player, maybe move to viewdata
                     if (!components[i].IsInitialised)
                         break;
                     if (toggleCameraKey.wasPressedThisFrame)
@@ -65,11 +62,11 @@ namespace KitchenFirstPersonView
                         my_component.IsActive = !my_component.IsActive;
                         Set(ent, my_component);
                     }
-                }
+                }*/
 
                 foreach (CLinkedView view in linkedViews)
                 {
-                    SendUpdate(view, new ViewData { IsActive = components[0].IsActive, IsInitialised = components[0].IsInitialised, Source = InputSourceIdentifier.Identifier });
+                    SendUpdate(view, new ViewData { IsActive = components[0].IsActive, IsInitialised = components[0].IsInitialised, Source = InputSourceIdentifier.Identifier, LookSensitivity = 5.0f });
 
                     // protected bool ApplyUpdates(ViewIdentifier identifier, Action<TResp> act, bool only_final_update = false)
                     // As this is a subview, identifier refers to the main view identifier
@@ -104,6 +101,7 @@ namespace KitchenFirstPersonView
                     var my_component = components[i];
 
                     my_component.IsInitialised = data.IsInitialised;
+                    my_component.IsActive = data.IsActive;
                     Set(ent, my_component);
                 }
             }
@@ -117,6 +115,7 @@ namespace KitchenFirstPersonView
             [Key(1)] public bool IsInitialised;
             [Key(2)] public Vector3 MovementVector;
             [Key(4)] public int Source;
+            [Key(5)] public float LookSensitivity;
 
 
             public IUpdatableObject GetRelevantSubview(IObjectView view)
@@ -151,10 +150,6 @@ namespace KitchenFirstPersonView
         [MessagePackObject(false)]
         public class ResponseData : IResponseData, IViewResponseData
         {
-            // You MUST also and mark each field with a key
-            // All players must be running versions of the game with the same assigned keys.
-            // It is recommended not to change keys after releasing your mod
-            // The specifc key used does not matter, as long as there is no overlap.
             [Key(0)] public bool IsActive;
             [Key(1)] public bool IsInitialised;
         }
@@ -176,10 +171,6 @@ namespace KitchenFirstPersonView
         // This runs locally for each client every frame
         public void Update()
         {
-            // Remember that this is Monobehaviour, not ECS
-            // Use this to prepare the response data to be sent
-            // You can use Callback here as well. But must perform a null check, since Callback may not be initialized (I'm not sure I recommend this XD)
-
             if (incrementCounterKey.isPressed)
             {
                 if (!wasPressed)
@@ -194,18 +185,19 @@ namespace KitchenFirstPersonView
         private GameObject firstPersonCamera = null;
 
         List<InputAction> movementAndLookActions = new List<InputAction>();
-        private InputAction rgtStick;
+        //private InputAction rgtStick;
         private InputAction lookAction;
         private InputAction moveAction;
+        private float xRotation = 0f;
+        private KeyControl toggleCameraKey;
+
+        private const string ITEM_HOLDPOINT_PATH = "MorphmanPlus/Hold Points/Item Hold Point";
 
         // This is done so some aspects are only run once, instead of every frame TODO: REWORK REWORK REWORK
-        private bool active = false;
+        private bool active = true;
 
         protected override void UpdateData(ViewData data)
         {
-            // Perform any view updates here
-            // Remember that this is Monobehaviour, not ECS
-            // Eg. You can change whether a GameObject is active or not
             if (data.Source != InputSourceIdentifier.Identifier)
                 return;
 
@@ -216,7 +208,8 @@ namespace KitchenFirstPersonView
                 // Sets initialise on the component.
                 Callback.Invoke(new ResponseData
                 {
-                    IsInitialised = true
+                    IsInitialised = true,
+                    IsActive = data.IsActive
                 }, typeof(ResponseData));
 
 
@@ -237,8 +230,9 @@ namespace KitchenFirstPersonView
                 }
 
                 lookAction = new InputAction("look", binding: "<Mouse>/delta");
+                lookAction.AddBinding("<Gamepad>/rightStick");
 
-                rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
+                //rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
 
                 moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "stickDeadzone(min=0.125,max=0.925)");
                 moveAction.AddCompositeBinding("Dpad")
@@ -247,13 +241,22 @@ namespace KitchenFirstPersonView
                     .With("Left", "<Keyboard>/a")
                     .With("Right", "<Keyboard>/d");
 
-                
+                toggleCameraKey = Keyboard.current.f5Key;
             }
 
             // Anything below here requires the camera gameobject to not be null to be activated
             if (firstPersonCamera == null)
                 return;
 
+            // Toggle Active
+            if (toggleCameraKey.wasPressedThisFrame)
+            {
+                Callback.Invoke(new ResponseData
+                {
+                    IsActive = !data.IsActive,
+                    IsInitialised = data.IsInitialised
+                }, typeof(ResponseData));
+            }
             
             if (data.IsActive)
             {
@@ -264,7 +267,7 @@ namespace KitchenFirstPersonView
                     firstPersonCamera.gameObject.SetActive(true);
 
                     moveAction.Enable();
-                    rgtStick.Enable();
+                    //rgtStick.Enable();
                     lookAction.Enable();
                     foreach (var action in movementAndLookActions)
                     {
@@ -273,6 +276,9 @@ namespace KitchenFirstPersonView
 
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+
+                    Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
+                    transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointPosition;
                 }
             }
             else
@@ -284,7 +290,7 @@ namespace KitchenFirstPersonView
                     firstPersonCamera.gameObject.SetActive(false);
 
                     moveAction.Disable();
-                    rgtStick.Disable();
+                    //rgtStick.Disable();
                     lookAction.Disable();
                     foreach (var action in movementAndLookActions)
                     {
@@ -293,6 +299,9 @@ namespace KitchenFirstPersonView
 
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
+
+                    Vector3 origLocalPos = new Vector3(0f, 1.158f, 0.336f);
+                    transform.Find(ITEM_HOLDPOINT_PATH).localPosition = origLocalPos;
                 }
             }
 
@@ -305,7 +314,7 @@ namespace KitchenFirstPersonView
 
 
             // Mouse movement
-            if (rgtStick.ReadValue<Vector2>().x != 0 || rgtStick.ReadValue<Vector2>().y != 0)
+            /*if (rgtStick.ReadValue<Vector2>().x != 0 || rgtStick.ReadValue<Vector2>().y != 0)
             {
                 float x = rgtStick.ReadValue<Vector2>().x * 2f;
                 float y = rgtStick.ReadValue<Vector2>().y * -2f;
@@ -318,7 +327,18 @@ namespace KitchenFirstPersonView
             float mouseY = (mouseMove.y / 8) * -1;
 
             transform.Rotate(new Vector3(0, mouseX, 0));
-            firstPersonCamera.transform.Rotate(new Vector3(mouseY, 0, 0));
+            firstPersonCamera.transform.Rotate(new Vector3(mouseY, 0, 0));*/
+
+            Vector2 looking = lookAction.ReadValue<Vector2>();
+            float lookX = looking.x * data.LookSensitivity * Time.deltaTime;
+            float lookY = looking.y * data.LookSensitivity * Time.deltaTime;
+
+            xRotation -= lookY;
+            xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+
+            firstPersonCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+
+            transform.Rotate(Vector3.up * lookX);
         }
 
 
