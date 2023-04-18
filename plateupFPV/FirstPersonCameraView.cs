@@ -47,6 +47,7 @@ namespace KitchenFirstPersonView
 
                 using NativeArray<CLinkedView> linkedViews = Query.ToComponentDataArray<CLinkedView>(Allocator.Temp);
                 using NativeArray<CFirstPersonPlayer> components = Query.ToComponentDataArray<CFirstPersonPlayer>(Allocator.Temp);
+                using NativeArray<CPlayer> playerComponent = Query.ToComponentDataArray<CPlayer>(Allocator.Temp);
                 using var ents = Query.ToEntityArray(Allocator.Temp);
 
                 //  ***************MOVED TO VIEWDATA
@@ -66,7 +67,7 @@ namespace KitchenFirstPersonView
 
                 foreach (CLinkedView view in linkedViews)
                 {
-                    SendUpdate(view, new ViewData { IsActive = components[0].IsActive, IsInitialised = components[0].IsInitialised, Source = InputSourceIdentifier.Identifier, LookSensitivity = 5.0f });
+                    SendUpdate(view, new ViewData { IsActive = components[0].IsActive, IsInitialised = components[0].IsInitialised, Source = InputSourceIdentifier.Identifier, LookSensitivity = 5.0f, Speed = playerComponent[0].Speed });
 
                     // protected bool ApplyUpdates(ViewIdentifier identifier, Action<TResp> act, bool only_final_update = false)
                     // As this is a subview, identifier refers to the main view identifier
@@ -116,7 +117,7 @@ namespace KitchenFirstPersonView
             [Key(2)] public Vector3 MovementVector;
             [Key(4)] public int Source;
             [Key(5)] public float LookSensitivity;
-
+            [Key(6)] public float Speed;
 
             public IUpdatableObject GetRelevantSubview(IObjectView view)
             {
@@ -230,7 +231,7 @@ namespace KitchenFirstPersonView
                 }
 
                 lookAction = new InputAction("look", binding: "<Mouse>/delta");
-                lookAction.AddBinding("<Gamepad>/rightStick");
+                lookAction.AddBinding("<Gamepad>/rightStick").WithName("Gamepad");
 
                 //rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
 
@@ -305,31 +306,22 @@ namespace KitchenFirstPersonView
                 }
             }
 
+            
 
             // Movement
             float moveSpeed = 60f;
             Vector2 movementDir = moveAction.ReadValue<Vector2>().normalized;
             Vector3 move = transform.right * movementDir.x + transform.forward * movementDir.y;
-            GetComponent<Rigidbody>().AddForce(move * moveSpeed * Time.deltaTime, ForceMode.VelocityChange);
+            GetComponent<Rigidbody>().AddForce(move * moveSpeed * data.Speed * Time.deltaTime, ForceMode.VelocityChange);
 
 
-            // Mouse movement
-            /*if (rgtStick.ReadValue<Vector2>().x != 0 || rgtStick.ReadValue<Vector2>().y != 0)
-            {
-                float x = rgtStick.ReadValue<Vector2>().x * 2f;
-                float y = rgtStick.ReadValue<Vector2>().y * -2f;
-                transform.Rotate(new Vector3(0, x, 0));
-                firstPersonCamera.transform.Rotate(new Vector3(y, 0, 0));
-            }
-
-            Vector2 mouseMove = lookAction.ReadValue<Vector2>();
-            float mouseX = mouseMove.x / 4;
-            float mouseY = (mouseMove.y / 8) * -1;
-
-            transform.Rotate(new Vector3(0, mouseX, 0));
-            firstPersonCamera.transform.Rotate(new Vector3(mouseY, 0, 0));*/
-
+            // Look movement
             Vector2 looking = lookAction.ReadValue<Vector2>();
+            /*float inputDeviceMultiplier = 0f;
+            if (data.IsGamepadPlayer)
+            {
+                inputDeviceMultiplier = 8f;
+            }*/
             float lookX = looking.x * data.LookSensitivity * Time.deltaTime;
             float lookY = looking.y * data.LookSensitivity * Time.deltaTime;
 
