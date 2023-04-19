@@ -270,9 +270,9 @@ namespace KitchenFirstPersonView
                 }
 
                 lookAction = new InputAction("look", binding: "<Mouse>/delta");
-                lookAction.AddBinding("<Gamepad>/rightStick").WithName("Gamepad");
+                lookAction.AddBinding("<Gamepad>/rightStick").WithProcessor("scaleVector2(x=50,y=50);stickDeadzone(min=0.125,max=0.925");
 
-                moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "stickDeadzone(min=0.125,max=0.925)");
+                moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "axisDeadzone(min=0.125,max=0.925)");
                 moveAction.AddCompositeBinding("Dpad")
                     .With("Up", "<Keyboard>/w")
                     .With("Down", "<Keyboard>/s")
