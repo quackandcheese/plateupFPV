@@ -30,6 +30,7 @@ namespace KitchenFirstPersonView
         {
             EntityQuery Query;
             private KeyControl toggleCameraKey;
+            private bool wasPressed;
 
             protected override void Initialise()
             {
@@ -38,7 +39,7 @@ namespace KitchenFirstPersonView
                 Query = GetEntityQuery(typeof(CLinkedView), typeof(CFirstPersonPlayer));
 
 
-                //toggleCameraKey = Keyboard.current.f5Key;
+                toggleCameraKey = Keyboard.current.f5Key;
             }
 
             protected override void OnUpdate()
@@ -65,9 +66,22 @@ namespace KitchenFirstPersonView
                     }
                 }*/
 
+                for (var i = 0; i < linkedViews.Length; i++)
+                {
+                    if (toggleCameraKey.isPressed)
+                    {
+                        if (!wasPressed)
+                        {
+                            SendUpdate(linkedViews[i], new ViewData { IsActive = components[i].IsActive, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, LookSensitivity = 5.0f, Speed = playerComponent[i].Speed });
+                        }
+                        wasPressed = true;
+                    }
+                    else wasPressed = false;
+                }
+
                 foreach (CLinkedView view in linkedViews)
                 {
-                    SendUpdate(view, new ViewData { IsActive = components[0].IsActive, IsInitialised = components[0].IsInitialised, Source = InputSourceIdentifier.Identifier, LookSensitivity = 5.0f, Speed = playerComponent[0].Speed });
+                    //SendUpdate(view, new ViewData { IsActive = components[0].IsActive, IsInitialised = components[0].IsInitialised, Source = playerComponent[0].InputSource, LookSensitivity = 5.0f, Speed = playerComponent[0].Speed });
 
                     // protected bool ApplyUpdates(ViewIdentifier identifier, Action<TResp> act, bool only_final_update = false)
                     // As this is a subview, identifier refers to the main view identifier
@@ -85,33 +99,38 @@ namespace KitchenFirstPersonView
 
             private void PerformUpdateWithResponse(ResponseData data)
             {
-                // Do something for each ResponseData packet received
-                // This is ECS only
-                //Mod.LogInfo(data.Text);
                 if (data == null)
                     return;
 
                 using NativeArray<CLinkedView> linkedViews = Query.ToComponentDataArray<CLinkedView>(Allocator.Temp);
-                using NativeArray<CFirstPersonPlayer> components = Query.ToComponentDataArray<CFirstPersonPlayer>(Allocator.Temp);
-                using var ents = Query.ToEntityArray(Allocator.Temp);
+                using NativeArray<CFirstPersonPlayer> fppComponents = Query.ToComponentDataArray<CFirstPersonPlayer>(Allocator.Temp);
+                using NativeArray<CPlayer> playerComponents = Query.ToComponentDataArray<CPlayer>(Allocator.Temp);
+                using NativeArray<Entity> entities = Query.ToEntityArray(Allocator.Temp);
 
                 // When Camera is initialised in UpdateData, this is called in callback and sets the component
-                for (var i = 0; i < ents.Length; i++)
-                {
-                    var ent = ents[i];
-                    var my_component = components[i];
 
-                    my_component.IsInitialised = data.IsInitialised;
-                    my_component.IsActive = data.IsActive;
-                    Set(ent, my_component);
+                for (int i = 0; i < playerComponents.Length; i++)
+                {
+                    Entity ent = entities[i];
+                    CPlayer player = playerComponents[i];
+                    CFirstPersonPlayer fpp = fppComponents[i];
+
+                    if (player.InputSource != data.Source)
+                        continue;
+
+                    fpp.IsInitialised = data.IsInitialised;
+                    fpp.IsActive = data.IsActive;
+                    Set(ent, fpp);
+                    break;
                 }
+                return;
             }
         }
 
         [MessagePackObject(false)]
         public class ViewData : ISpecificViewData, IViewData.ICheckForChanges<ViewData>
         {
-            
+
             [Key(0)] public bool IsActive;
             [Key(1)] public bool IsInitialised;
             [Key(2)] public Vector3 MovementVector;
@@ -153,6 +172,7 @@ namespace KitchenFirstPersonView
         {
             [Key(0)] public bool IsActive;
             [Key(1)] public bool IsInitialised;
+            [Key(2)] public int Source;
         }
 
 
@@ -163,39 +183,47 @@ namespace KitchenFirstPersonView
         private Action<IResponseData, Type> Callback;
 
 
-        // Some private fields used for example. Can be ignored
-        private bool wasPressed = false;
-        private int counter = 0;
-        private KeyControl incrementCounterKey = Keyboard.current.yKey;
-
-
+        private FirstPersonPlayerView.ViewData Data;
         // This runs locally for each client every frame
         public void Update()
         {
-            if (incrementCounterKey.isPressed)
+            if (Data.Source != InputSourceIdentifier.Identifier || !Data.IsActive)
+                return;
+
+            // Movement
+            float moveSpeed = 3000f;
+            Vector2 movementDir = moveAction.ReadValue<Vector2>().normalized;
+            Vector3 move = transform.right * movementDir.x + transform.forward * movementDir.y;
+            GetComponent<Rigidbody>().AddForce(move * moveSpeed * Data.Speed * Time.deltaTime);
+
+
+            // Look movement
+            Vector2 looking = lookAction.ReadValue<Vector2>();
+            /*float inputDeviceMultiplier = 0f;
+            if (data.IsGamepadPlayer)
             {
-                if (!wasPressed)
-                {
-                    Mod.LogInfo($"Incremented counter to {++counter}");
-                }
-                wasPressed = true;
-            }
-            else wasPressed = false;
+                inputDeviceMultiplier = 8f;
+            }*/
+            float lookX = looking.x * Data.LookSensitivity * Time.deltaTime;
+            float lookY = looking.y * Data.LookSensitivity * Time.deltaTime;
+
+            xRotation -= lookY;
+            xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+
+            firstPersonCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+
+            transform.Rotate(Vector3.up * lookX);
         }
 
         private GameObject firstPersonCamera = null;
 
         List<InputAction> movementAndLookActions = new List<InputAction>();
-        //private InputAction rgtStick;
         private InputAction lookAction;
         private InputAction moveAction;
         private float xRotation = 0f;
-        private KeyControl toggleCameraKey;
 
         private const string ITEM_HOLDPOINT_PATH = "MorphmanPlus/Hold Points/Item Hold Point";
 
-        // This is done so some aspects are only run once, instead of every frame TODO: REWORK REWORK REWORK
-        private bool active = true;
 
         protected override void UpdateData(ViewData data)
         {
@@ -210,7 +238,8 @@ namespace KitchenFirstPersonView
                 Callback.Invoke(new ResponseData
                 {
                     IsInitialised = true,
-                    IsActive = data.IsActive
+                    IsActive = data.IsActive,
+                    Source = data.Source,
                 }, typeof(ResponseData));
 
 
@@ -233,104 +262,66 @@ namespace KitchenFirstPersonView
                 lookAction = new InputAction("look", binding: "<Mouse>/delta");
                 lookAction.AddBinding("<Gamepad>/rightStick").WithName("Gamepad");
 
-                //rgtStick = new InputAction("RightStick", binding: "<Gamepad>/rightStick");
-
                 moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "stickDeadzone(min=0.125,max=0.925)");
                 moveAction.AddCompositeBinding("Dpad")
                     .With("Up", "<Keyboard>/w")
                     .With("Down", "<Keyboard>/s")
                     .With("Left", "<Keyboard>/a")
                     .With("Right", "<Keyboard>/d");
-
-                toggleCameraKey = Keyboard.current.f5Key;
             }
 
             // Anything below here requires the camera gameobject to not be null to be activated
             if (firstPersonCamera == null)
                 return;
 
+
             // Toggle Active
-            if (toggleCameraKey.wasPressedThisFrame)
+            Callback.Invoke(new ResponseData
             {
-                Callback.Invoke(new ResponseData
-                {
-                    IsActive = !data.IsActive,
-                    IsInitialised = data.IsInitialised
-                }, typeof(ResponseData));
-            }
+                IsActive = !data.IsActive,
+                IsInitialised = data.IsInitialised,
+                Source = data.Source,
+            }, typeof(ResponseData));
+
+
             
             if (data.IsActive)
             {
-                if (!active)
+                firstPersonCamera.gameObject.SetActive(true);
+
+                moveAction.Enable();
+                lookAction.Enable();
+                foreach (var action in movementAndLookActions)
                 {
-                    active = true;
-
-                    firstPersonCamera.gameObject.SetActive(true);
-
-                    moveAction.Enable();
-                    //rgtStick.Enable();
-                    lookAction.Enable();
-                    foreach (var action in movementAndLookActions)
-                    {
-                        action.Disable();
-                    }
-
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
-
-                    Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
-                    transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointPosition;
+                    action.Disable();
                 }
+
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+
+                Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
+                transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointPosition;
             }
             else
-            { 
-                if (active)
+            {
+                firstPersonCamera.gameObject.SetActive(false);
+
+                moveAction.Disable();
+                lookAction.Disable();
+                foreach (var action in movementAndLookActions)
                 {
-                    active = false;
-
-                    firstPersonCamera.gameObject.SetActive(false);
-
-                    moveAction.Disable();
-                    //rgtStick.Disable();
-                    lookAction.Disable();
-                    foreach (var action in movementAndLookActions)
-                    {
-                        action.Enable();
-                    }
-
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-
-                    Vector3 origLocalPos = new Vector3(0f, 1.158f, 0.336f);
-                    transform.Find(ITEM_HOLDPOINT_PATH).localPosition = origLocalPos;
+                    action.Enable();
                 }
+
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+
+                Vector3 origLocalPos = new Vector3(0f, 1.158f, 0.336f);
+                transform.Find(ITEM_HOLDPOINT_PATH).localPosition = origLocalPos;
             }
 
-            
 
-            // Movement
-            float moveSpeed = 60f;
-            Vector2 movementDir = moveAction.ReadValue<Vector2>().normalized;
-            Vector3 move = transform.right * movementDir.x + transform.forward * movementDir.y;
-            GetComponent<Rigidbody>().AddForce(move * moveSpeed * data.Speed * Time.deltaTime, ForceMode.VelocityChange);
-
-
-            // Look movement
-            Vector2 looking = lookAction.ReadValue<Vector2>();
-            /*float inputDeviceMultiplier = 0f;
-            if (data.IsGamepadPlayer)
-            {
-                inputDeviceMultiplier = 8f;
-            }*/
-            float lookX = looking.x * data.LookSensitivity * Time.deltaTime;
-            float lookY = looking.y * data.LookSensitivity * Time.deltaTime;
-
-            xRotation -= lookY;
-            xRotation = Mathf.Clamp(xRotation, -90f, 90f);
-
-            firstPersonCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
-
-            transform.Rotate(Vector3.up * lookX);
+            this.Data = data;
         }
 
 
