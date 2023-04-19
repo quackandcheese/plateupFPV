@@ -29,17 +29,12 @@ namespace KitchenFirstPersonView
         public class UpdateView : ResponsiveViewSystemBase<ViewData, ResponseData>, IModSystem
         {
             EntityQuery Query;
-            private KeyControl toggleCameraKey;
-            private bool wasPressed;
 
             protected override void Initialise()
             {
                 base.Initialise();
 
                 Query = GetEntityQuery(typeof(CLinkedView), typeof(CFirstPersonPlayer));
-
-
-                toggleCameraKey = Keyboard.current.f5Key;
             }
 
             protected override void OnUpdate()
@@ -68,15 +63,7 @@ namespace KitchenFirstPersonView
 
                 for (var i = 0; i < linkedViews.Length; i++)
                 {
-                    if (toggleCameraKey.isPressed)
-                    {
-                        if (!wasPressed)
-                        {
-                            SendUpdate(linkedViews[i], new ViewData { IsActive = components[i].IsActive, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, LookSensitivity = 5.0f, Speed = playerComponent[i].Speed });
-                        }
-                        wasPressed = true;
-                    }
-                    else wasPressed = false;
+                    SendUpdate(linkedViews[i], new ViewData { IsActive = components[i].IsActive, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, LookSensitivity = 5.0f, Speed = playerComponent[i].Speed });
                 }
 
                 foreach (CLinkedView view in linkedViews)
@@ -130,13 +117,11 @@ namespace KitchenFirstPersonView
         [MessagePackObject(false)]
         public class ViewData : ISpecificViewData, IViewData.ICheckForChanges<ViewData>
         {
-
-            [Key(0)] public bool IsActive;
+            [Key(0)] public int Source;
             [Key(1)] public bool IsInitialised;
-            [Key(2)] public Vector3 MovementVector;
-            [Key(4)] public int Source;
-            [Key(5)] public float LookSensitivity;
-            [Key(6)] public float Speed;
+            [Key(2)] public bool IsActive;
+            [Key(3)] public float LookSensitivity;
+            [Key(4)] public float Speed;
 
             public IUpdatableObject GetRelevantSubview(IObjectView view)
             {
@@ -158,7 +143,7 @@ namespace KitchenFirstPersonView
 
             public bool IsChangedFrom(ViewData check)
             {
-                return true;
+                return IsActive != check.IsActive || IsInitialised != check.IsInitialised || Source != check.Source || LookSensitivity != check.LookSensitivity || Speed != check.Speed;
             }
         }
 
@@ -187,8 +172,31 @@ namespace KitchenFirstPersonView
         // This runs locally for each client every frame
         public void Update()
         {
-            if (Data.Source != InputSourceIdentifier.Identifier || !Data.IsActive)
+            if (Data.Source != InputSourceIdentifier.Identifier)
                 return;
+
+            // Toggle Active
+            if (toggleCameraKey.wasPressedThisFrame)
+            {
+                if (Callback != null)
+                {
+                    Callback.Invoke(new ResponseData
+                    {
+                        IsActive = !Data.IsActive,
+                        IsInitialised = Data.IsInitialised,
+                        Source = Data.Source,
+                    }, typeof(ResponseData));
+                }
+                else
+                {
+                    Mod.LogError("*** CALLBACK IS NULL ***");
+                }
+            }
+
+            if (!Data.IsActive)
+            {
+                return;
+            }
 
             // Movement
             float moveSpeed = 3000f;
@@ -221,6 +229,7 @@ namespace KitchenFirstPersonView
         private InputAction lookAction;
         private InputAction moveAction;
         private float xRotation = 0f;
+        private KeyControl toggleCameraKey = Keyboard.current.f5Key;
 
         private const string ITEM_HOLDPOINT_PATH = "MorphmanPlus/Hold Points/Item Hold Point";
 
@@ -275,15 +284,6 @@ namespace KitchenFirstPersonView
                 return;
 
 
-            // Toggle Active
-            Callback.Invoke(new ResponseData
-            {
-                IsActive = !data.IsActive,
-                IsInitialised = data.IsInitialised,
-                Source = data.Source,
-            }, typeof(ResponseData));
-
-
             
             if (data.IsActive)
             {
@@ -319,7 +319,6 @@ namespace KitchenFirstPersonView
                 Vector3 origLocalPos = new Vector3(0f, 1.158f, 0.336f);
                 transform.Find(ITEM_HOLDPOINT_PATH).localPosition = origLocalPos;
             }
-
 
             this.Data = data;
         }
