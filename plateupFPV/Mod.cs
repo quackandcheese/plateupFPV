@@ -8,6 +8,9 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using KitchenLib.Preferences;
+using Kitchen;
+using StreamerPack;
 
 namespace KitchenFirstPersonView
 {
@@ -25,6 +28,17 @@ namespace KitchenFirstPersonView
         // e.g. ">=1.1.3" current and all future
         // e.g. ">=1.1.3 <=1.2.3" for all from/until
 
+        #region Preferences
+        public const string FOV_ID = "fov";
+        public const string SENSITIVITY_ID = "sensitivity";
+        public const string FPV_ENABLED_ID = "firstPersonCamera";
+        #endregion
+
+        public static Dictionary<string, int> DefaultValuesDict;
+        internal static PreferenceManager PrefManager;
+        internal static PreferenceFloat SensitivityPreference = new PreferenceFloat(SENSITIVITY_ID, 5.0f);
+        internal static PreferenceInt FOVPreference = new PreferenceInt(FOV_ID, 90);
+
         // Boolean constant whose value depends on whether you built with DEBUG or RELEASE mode, useful for testing
 #if DEBUG
         public const bool DEBUG_MODE = true;
@@ -41,19 +55,9 @@ namespace KitchenFirstPersonView
             LogWarning($"{MOD_GUID} v{MOD_VERSION} in use!");
         }
 
-        private void AddGameData()
-        {
-            LogInfo("Attempting to register game data...");
-
-            // AddGameDataObject<MyCustomGDO>();
-
-            LogInfo("Done loading game data.");
-        }
-
         protected override void OnUpdate()
         {
         }
-
 
         protected override void OnPostActivate(KitchenMods.Mod mod)
         {
@@ -64,14 +68,42 @@ namespace KitchenFirstPersonView
             Bundle = mod.GetPacks<AssetBundleModPack>().SelectMany(e => e.AssetBundles).First();
             LogInfo("Done loading asset bundle.");
 
-            // Register custom GDOs
-            AddGameData();
+            PrefManager = new PreferenceManager(MOD_GUID);
 
-            // Perform actions when game data is built
-            Events.BuildGameDataEvent += delegate (object s, BuildGameDataEventArgs args)
-            {
+            PrefManager.RegisterPreference(SensitivityPreference);
+            PrefManager.RegisterPreference(FOVPreference);
+
+
+            ModsPreferencesMenu<PauseMenuAction>.RegisterMenu("First Person View", typeof(FirstPersonViewMenu<PauseMenuAction>), typeof(PauseMenuAction));
+
+            Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent += (s, args) => {
+                args.Menus.Add(typeof(FirstPersonViewMenu<PauseMenuAction>), new FirstPersonViewMenu<PauseMenuAction>(args.Container, args.Module_list));
             };
         }
+
+        private void CreatePreferencesNew()
+        {
+            /*DefaultValuesDict = new Dictionary<string, int>()
+            {
+                { FOV_ID, 90 },
+                { SENSITIVITY_ID, 5 },
+                { FPV_ENABLED_ID, 0 }
+            };
+
+            PrefManager = new PreferenceManager(MOD_GUID);
+
+            PrefManager
+                .AddLabel("First Person View")
+                .AddSpacer()
+                .AddOption<int>
+                (
+                    FPV_ENABLED_ID, 
+                    0,
+                    new int[] { 0, 1 },
+                    new string[] { "Disabled", "Enabled" }
+                );*/
+        }
+
         #region Logging
         public static void LogInfo(string _log) { Debug.Log($"[{MOD_NAME}] " + _log); }
         public static void LogWarning(string _log) { Debug.LogWarning($"[{MOD_NAME}] " + _log); }

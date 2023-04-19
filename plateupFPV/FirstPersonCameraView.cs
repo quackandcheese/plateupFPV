@@ -15,6 +15,7 @@ using UnityEngine;
 using System.ComponentModel;
 using Unity.Entities.UniversalDelegates;
 using UnityEngine.Rendering;
+using KitchenLib.Preferences;
 
 namespace KitchenFirstPersonView
 {
@@ -63,7 +64,7 @@ namespace KitchenFirstPersonView
 
                 for (var i = 0; i < linkedViews.Length; i++)
                 {
-                    SendUpdate(linkedViews[i], new ViewData { IsActive = components[i].IsActive, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, LookSensitivity = 5.0f, Speed = playerComponent[i].Speed });
+                    SendUpdate(linkedViews[i], new ViewData { IsActive = components[i].IsActive, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, Speed = playerComponent[i].Speed });
                 }
 
                 foreach (CLinkedView view in linkedViews)
@@ -120,8 +121,7 @@ namespace KitchenFirstPersonView
             [Key(0)] public int Source;
             [Key(1)] public bool IsInitialised;
             [Key(2)] public bool IsActive;
-            [Key(3)] public float LookSensitivity;
-            [Key(4)] public float Speed;
+            [Key(3)] public float Speed;
 
             public IUpdatableObject GetRelevantSubview(IObjectView view)
             {
@@ -143,7 +143,7 @@ namespace KitchenFirstPersonView
 
             public bool IsChangedFrom(ViewData check)
             {
-                return IsActive != check.IsActive || IsInitialised != check.IsInitialised || Source != check.Source || LookSensitivity != check.LookSensitivity || Speed != check.Speed;
+                return IsActive != check.IsActive || IsInitialised != check.IsInitialised || Source != check.Source || Speed != check.Speed;
             }
         }
 
@@ -212,8 +212,12 @@ namespace KitchenFirstPersonView
             {
                 inputDeviceMultiplier = 8f;
             }*/
-            float lookX = looking.x * Data.LookSensitivity * Time.deltaTime;
-            float lookY = looking.y * Data.LookSensitivity * Time.deltaTime;
+
+            PreferenceFloat preferenceFloat = Mod.PrefManager.GetPreference<PreferenceFloat>(Mod.SENSITIVITY_ID);
+            float lookSensitivity = preferenceFloat.Get();
+
+            float lookX = looking.x * lookSensitivity * Time.deltaTime;
+            float lookY = looking.y * lookSensitivity * Time.deltaTime;
 
             xRotation -= lookY;
             xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -270,7 +274,7 @@ namespace KitchenFirstPersonView
                 }
 
                 lookAction = new InputAction("look", binding: "<Mouse>/delta");
-                lookAction.AddBinding("<Gamepad>/rightStick").WithProcessor("scaleVector2(x=50,y=50);stickDeadzone(min=0.125,max=0.925");
+                lookAction.AddBinding("<Gamepad>/rightStick").WithProcessor("scaleVector2(x=50,y=50)");
 
                 moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "axisDeadzone(min=0.125,max=0.925)");
                 moveAction.AddCompositeBinding("Dpad")
