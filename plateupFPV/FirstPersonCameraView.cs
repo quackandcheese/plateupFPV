@@ -238,7 +238,8 @@ namespace KitchenFirstPersonView
         {
             if (data.Source != InputSourceIdentifier.Identifier)
                 return;
-
+            
+            this.Data = data;
 
             // Initializing Camera
             if (!data.IsInitialised)
@@ -319,8 +320,6 @@ namespace KitchenFirstPersonView
                 Vector3 origLocalPos = new Vector3(0f, 1.158f, 0.336f);
                 transform.Find(ITEM_HOLDPOINT_PATH).localPosition = origLocalPos;
             }
-
-            this.Data = data;
         }
 
 
