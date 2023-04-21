@@ -30,12 +30,14 @@ namespace KitchenFirstPersonView
         public class UpdateView : ResponsiveViewSystemBase<ViewData, ResponseData>, IModSystem
         {
             EntityQuery Query;
+            List<int> localInputSources;
 
             protected override void Initialise()
             {
                 base.Initialise();
 
                 Query = GetEntityQuery(typeof(CLinkedView), typeof(CFirstPersonPlayer));
+                localInputSources = new List<int>();
             }
 
             protected override void OnUpdate()
@@ -43,8 +45,8 @@ namespace KitchenFirstPersonView
                 if (Query.IsEmpty) return;
 
                 using NativeArray<CLinkedView> linkedViews = Query.ToComponentDataArray<CLinkedView>(Allocator.Temp);
-                using NativeArray<CFirstPersonPlayer> components = Query.ToComponentDataArray<CFirstPersonPlayer>(Allocator.Temp);
-                using NativeArray<CPlayer> playerComponent = Query.ToComponentDataArray<CPlayer>(Allocator.Temp);
+                using NativeArray<CFirstPersonPlayer> firstPersonPlayerComponents = Query.ToComponentDataArray<CFirstPersonPlayer>(Allocator.Temp);
+                using NativeArray<CPlayer> playerComponents = Query.ToComponentDataArray<CPlayer>(Allocator.Temp);
                 using var ents = Query.ToEntityArray(Allocator.Temp);
 
                 using NativeArray<CInputData> inputDataComponent = Query.ToComponentDataArray<CInputData>(Allocator.Temp);
@@ -66,9 +68,33 @@ namespace KitchenFirstPersonView
 
                 //bool isPaused = base.Time.IsPaused;
 
+                /*for (var i = 0; i < ents.Length; i++)
+                {
+                    var ent = ents[i];
+                    var playerComponent = playerComponents[i];
+                    var firstPersonPlayerComponent = firstPersonPlayerComponents[i];
+
+                    if (!firstPersonPlayerComponent.IsInitialised)
+                        break;
+                    if (playerComponent.InputSource == InputSourceIdentifier.Identifier && !localInputSources.Contains(playerComponent.InputSource))
+                    {
+                        localInputSources.Add(playerComponent.InputSource);
+                    }
+
+                    if (localInputSources.Count > 1)
+                    {
+                        firstPersonPlayerComponent.IsActive = false;
+                        Set(ent, firstPersonPlayerComponent);
+                    }
+                }*/
 
                 for (var i = 0; i < linkedViews.Length; i++)
                 {
+                    if (playerComponents[i].InputSource == InputSourceIdentifier.Identifier && !localInputSources.Contains(playerComponents[i].InputSource))
+                    {
+                        localInputSources.Add(playerComponents[i].InputSource);
+                    }
+
 
                     bool is_active = false;
                     if (inputDataComponent[i].State.Request == GameStateRequest.InLocalMenu)
@@ -77,9 +103,9 @@ namespace KitchenFirstPersonView
                     }
                     else
                     {
-                        is_active = components[i].IsActive;
+                        is_active = firstPersonPlayerComponents[i].IsActive;
                     }
-                    SendUpdate(linkedViews[i], new ViewData { IsActive = is_active, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, Speed = playerComponent[i].Speed, PlayerID = playerComponent[0].ID });
+                    SendUpdate(linkedViews[i], new ViewData { IsActive = is_active, IsInitialised = firstPersonPlayerComponents[i].IsInitialised, Source = playerComponents[i].InputSource, Speed = playerComponents[i].Speed, PlayerID = playerComponents[0].ID });
                 }
 
                 foreach (CLinkedView view in linkedViews)
@@ -185,6 +211,8 @@ namespace KitchenFirstPersonView
 
         public FirstPersonPlayerView.ViewData Data;
 
+
+        
         // This runs locally for each client every frame
         public void Update()
         {
@@ -292,7 +320,6 @@ namespace KitchenFirstPersonView
         private const string ITEM_HOLDPOINT_PATH = "MorphmanPlus/Hold Points/Item Hold Point";
         private const string HOLDPOINTS_PATH = "MorphmanPlus/Hold Points";
 
-
         protected override void UpdateData(ViewData data)
         {
             this.Data = data;
@@ -310,7 +337,6 @@ namespace KitchenFirstPersonView
                     IsActive = data.IsActive,
                     Source = data.Source,
                 }, typeof(ResponseData));
-
 
                 // Camera Setup
                 firstPersonCamera = Instantiate(Mod.Bundle.LoadAsset<GameObject>("FPV Camera"));
