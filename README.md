@@ -1,24 +1,31 @@
-A start at making a First Person View Mod for Plateup (Workshop)
+# First Person View Mod for PlateUp!
 
-Controls:
+Originally created by SpiffySnail, this is a more polished interpretation of a first-person perspective mod for the roguelike cooking game, PlateUp!
 
-F1: Toggle
-W: Move Forward
-A: Strafe Left
-S: Move Back
-D: Strafe Right
-Mouse: Control Camera
+## Controls
 
+### Keyboard + Mouse
 
-Current Features:
-- First Person Camera
-- Minimap Overhead
-- WASD FPS style movement
-- Mouse input for camera movement
-- Controller Support
-- UI will toggle FPV to display UI
+* F5: Toggle
+* Move: WASD
+* Look: Mouse
 
+### Controller
 
-Issues:
-- Camera needs to be clamped
-- Multiplayer doesn't work as camera is shared by all :(
+* Move: Left-Stick or D-pad
+* Look: Right-Stick
+
+## Current Features
+
+* First person camera with keyboard + mouse and controller support
+* Easy toggling of camera perspectives
+* Multiplayer support
+* NO local multiplayer support (yet)
+* UI pop-ups switch the perspective back to first-person
+* UI indicators in the world-space face towards the player while in first-person
+
+## Issues
+* Some UI indicators do not look at the player in first-person
+
+## See also
+* https://github.com/SpiffySnail/plateupFPV
