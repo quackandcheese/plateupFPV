@@ -47,6 +47,8 @@ namespace KitchenFirstPersonView
                 using NativeArray<CPlayer> playerComponent = Query.ToComponentDataArray<CPlayer>(Allocator.Temp);
                 using var ents = Query.ToEntityArray(Allocator.Temp);
 
+                using NativeArray<CInputData> inputDataComponent = Query.ToComponentDataArray<CInputData>(Allocator.Temp);
+
                 //  ***************MOVED TO VIEWDATA
                 /*for (var i = 0; i < ents.Length; i++)
                 {
@@ -62,9 +64,22 @@ namespace KitchenFirstPersonView
                     }
                 }*/
 
+                //bool isPaused = base.Time.IsPaused;
+
+
                 for (var i = 0; i < linkedViews.Length; i++)
                 {
-                    SendUpdate(linkedViews[i], new ViewData { IsActive = components[i].IsActive, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, Speed = playerComponent[i].Speed });
+
+                    bool is_active = false;
+                    if (inputDataComponent[i].State.Request == GameStateRequest.InLocalMenu)
+                    {
+                        is_active = false;
+                    }
+                    else
+                    {
+                        is_active = components[i].IsActive;
+                    }
+                    SendUpdate(linkedViews[i], new ViewData { IsActive = is_active, IsInitialised = components[i].IsInitialised, Source = playerComponent[i].InputSource, Speed = playerComponent[i].Speed, PlayerID = playerComponent[0].ID });
                 }
 
                 foreach (CLinkedView view in linkedViews)
@@ -122,6 +137,7 @@ namespace KitchenFirstPersonView
             [Key(1)] public bool IsInitialised;
             [Key(2)] public bool IsActive;
             [Key(3)] public float Speed;
+            [Key(4)] public int PlayerID;
 
             public IUpdatableObject GetRelevantSubview(IObjectView view)
             {
@@ -167,13 +183,14 @@ namespace KitchenFirstPersonView
         // Callback is initialized after the first ViewData is received
         private Action<IResponseData, Type> Callback;
 
+        public FirstPersonPlayerView.ViewData Data;
 
-        private FirstPersonPlayerView.ViewData Data;
         // This runs locally for each client every frame
         public void Update()
         {
             if (Data.Source != InputSourceIdentifier.Identifier)
                 return;
+
 
             // Toggle Active
             if (toggleCameraKey.wasPressedThisFrame)
@@ -193,9 +210,38 @@ namespace KitchenFirstPersonView
                 }
             }
 
+
+            PreferenceInt playerModelVisibilityPreference = Mod.PrefManager.GetPreference<PreferenceInt>(Mod.PLAYER_MODEL_VISIBLE_ID);
+            int playerModelVisibility = playerModelVisibilityPreference.Get();
+
+
             if (!Data.IsActive)
             {
+                transform.Find(PLAYER_MODEL_PATH).gameObject.SetActive(true);
+                transform.Find(COSMETICS_PATH).gameObject.SetActive(true);
                 return;
+            }
+
+            // Player Model Visibility
+            if (playerModelVisibility == 0)
+            {
+                transform.Find(PLAYER_MODEL_PATH).gameObject.SetActive(false);
+                transform.Find(COSMETICS_PATH).gameObject.SetActive(false);
+            }
+            else
+            {
+                transform.Find(PLAYER_MODEL_PATH).gameObject.SetActive(true);
+                transform.Find(COSMETICS_PATH).gameObject.SetActive(true);
+            }
+
+            // FOV
+            PreferenceInt fovPreference = Mod.PrefManager.GetPreference<PreferenceInt>(Mod.FOV_ID);
+            int fov = fovPreference.Get();
+
+            Camera fpvCam = firstPersonCamera.GetComponent<Camera>();
+            if (fpvCam != null)
+            {
+                fpvCam.fieldOfView = fov;
             }
 
             // Movement
@@ -213,8 +259,8 @@ namespace KitchenFirstPersonView
                 inputDeviceMultiplier = 8f;
             }*/
 
-            PreferenceFloat preferenceFloat = Mod.PrefManager.GetPreference<PreferenceFloat>(Mod.SENSITIVITY_ID);
-            float lookSensitivity = preferenceFloat.Get();
+            PreferenceFloat sensitivityFloat = Mod.PrefManager.GetPreference<PreferenceFloat>(Mod.SENSITIVITY_ID);
+            float lookSensitivity = sensitivityFloat.Get();
 
             float lookX = looking.x * lookSensitivity * Time.deltaTime;
             float lookY = looking.y * lookSensitivity * Time.deltaTime;
@@ -225,8 +271,14 @@ namespace KitchenFirstPersonView
             firstPersonCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
 
             transform.Rotate(Vector3.up * lookX);
+
+
+            // Hold Point Rotation
+            transform.Find(ITEM_HOLDPOINT_PATH).rotation = firstPersonCamera.transform.Find("HoldPoint").rotation;
+            transform.Find(ITEM_HOLDPOINT_PATH).position = firstPersonCamera.transform.Find("HoldPoint").position;
         }
 
+        
         private GameObject firstPersonCamera = null;
 
         List<InputAction> movementAndLookActions = new List<InputAction>();
@@ -235,15 +287,18 @@ namespace KitchenFirstPersonView
         private float xRotation = 0f;
         private KeyControl toggleCameraKey = Keyboard.current.f5Key;
 
+        private const string PLAYER_MODEL_PATH = "MorphmanPlus/Body";
+        private const string COSMETICS_PATH = "Cosmetics";
         private const string ITEM_HOLDPOINT_PATH = "MorphmanPlus/Hold Points/Item Hold Point";
+        private const string HOLDPOINTS_PATH = "MorphmanPlus/Hold Points";
 
 
         protected override void UpdateData(ViewData data)
         {
+            this.Data = data;
+
             if (data.Source != InputSourceIdentifier.Identifier)
                 return;
-            
-            this.Data = data;
 
             // Initializing Camera
             if (!data.IsInitialised)
@@ -273,15 +328,26 @@ namespace KitchenFirstPersonView
                     }
                 }
 
-                lookAction = new InputAction("look", binding: "<Mouse>/delta");
-                lookAction.AddBinding("<Gamepad>/rightStick").WithProcessor("scaleVector2(x=50,y=50)");
+                lookAction = new InputAction("look", InputActionType.Value);
 
-                moveAction = new InputAction("move", binding: "<Gamepad>/leftStick", processors: "axisDeadzone(min=0.125,max=0.925)");
-                moveAction.AddCompositeBinding("Dpad")
-                    .With("Up", "<Keyboard>/w")
-                    .With("Down", "<Keyboard>/s")
-                    .With("Left", "<Keyboard>/a")
-                    .With("Right", "<Keyboard>/d");
+                moveAction = new InputAction("move", InputActionType.Value);
+
+                if (InputSourceIdentifier.DefaultInputSource.GetCurrentController(data.PlayerID) == ControllerType.Keyboard)
+                {
+                    moveAction.AddCompositeBinding("Dpad")
+                        .With("Up", "<Keyboard>/w")
+                        .With("Down", "<Keyboard>/s")
+                        .With("Left", "<Keyboard>/a")
+                        .With("Right", "<Keyboard>/d");
+                    lookAction.AddBinding("<Mouse>/delta");
+                }
+                else
+                {
+                    moveAction.AddBinding("<Gamepad>/rightStick").WithProcessor("stickDeadzone(min=0.4,max=0.5)");
+                    lookAction.AddBinding("<Gamepad>/rightStick")
+                        .WithProcessor("stickDeadzone(min=0.125,max=0.925)")
+                        .WithProcessor("scaleVector2(x=50,y=50)");
+                }
             }
 
             // Anything below here requires the camera gameobject to not be null to be activated
@@ -304,8 +370,9 @@ namespace KitchenFirstPersonView
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
 
-                Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
-                transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointPosition;
+                //Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
+                Vector3 desiredHoldPointLocalPosition = new Vector3(0f, 0f, 0f);
+                transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointLocalPosition;
             }
             else
             {
@@ -323,6 +390,11 @@ namespace KitchenFirstPersonView
 
                 Vector3 origLocalPos = new Vector3(0f, 1.158f, 0.336f);
                 transform.Find(ITEM_HOLDPOINT_PATH).localPosition = origLocalPos;
+
+                Quaternion origLocalRot = Quaternion.identity;
+                transform.Find(ITEM_HOLDPOINT_PATH).localRotation = origLocalRot;
+
+                //TODO: Fix. I believe it doesn't return to proper position because in Update you are updating the Hold Points pos and rot, while here it is the item holdpoint.
             }
         }
 

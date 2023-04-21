@@ -306,6 +306,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 915960820064211420, guid: beb7179f027732e4ca6538e49a1b2234, type: 3}
+      propertyPath: m_FOVAxisMode
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 915960820064211421, guid: beb7179f027732e4ca6538e49a1b2234, type: 3}
       propertyPath: m_RootOrder
       value: 2

@@ -21,7 +21,7 @@ namespace KitchenFirstPersonView
         // Mod Version must follow semver notation e.g. "1.2.3"
         public const string MOD_GUID = "QuackAndCheese.PlateUp.FirstPersonView";
         public const string MOD_NAME = "First Person View";
-        public const string MOD_VERSION = "0.1.0";
+        public const string MOD_VERSION = "0.1.1";
         public const string MOD_AUTHOR = "QuackAndCheese";
         public const string MOD_GAMEVERSION = ">=1.1.4";
         // Game version this mod is designed for in semver
@@ -31,13 +31,15 @@ namespace KitchenFirstPersonView
         #region Preferences
         public const string FOV_ID = "fov";
         public const string SENSITIVITY_ID = "sensitivity";
+        public const string PLAYER_MODEL_VISIBLE_ID = "playerModelVisible";
         public const string FPV_ENABLED_ID = "firstPersonCamera";
         #endregion
 
         public static Dictionary<string, int> DefaultValuesDict;
         internal static PreferenceManager PrefManager;
         internal static PreferenceFloat SensitivityPreference = new PreferenceFloat(SENSITIVITY_ID, 5.0f);
-        internal static PreferenceInt FOVPreference = new PreferenceInt(FOV_ID, 90);
+        internal static PreferenceInt FOVPreference = new PreferenceInt(FOV_ID, 80);
+        internal static PreferenceInt PlayerModelVisibilityPreference = new PreferenceInt(PLAYER_MODEL_VISIBLE_ID, 0);
 
         // Boolean constant whose value depends on whether you built with DEBUG or RELEASE mode, useful for testing
 #if DEBUG
@@ -72,36 +74,15 @@ namespace KitchenFirstPersonView
 
             PrefManager.RegisterPreference(SensitivityPreference);
             PrefManager.RegisterPreference(FOVPreference);
+            PrefManager.RegisterPreference(PlayerModelVisibilityPreference);
 
+            PrefManager.Load();
 
             ModsPreferencesMenu<PauseMenuAction>.RegisterMenu("First Person View", typeof(FirstPersonViewMenu<PauseMenuAction>), typeof(PauseMenuAction));
 
             Events.PreferenceMenu_PauseMenu_CreateSubmenusEvent += (s, args) => {
                 args.Menus.Add(typeof(FirstPersonViewMenu<PauseMenuAction>), new FirstPersonViewMenu<PauseMenuAction>(args.Container, args.Module_list));
             };
-        }
-
-        private void CreatePreferencesNew()
-        {
-            /*DefaultValuesDict = new Dictionary<string, int>()
-            {
-                { FOV_ID, 90 },
-                { SENSITIVITY_ID, 5 },
-                { FPV_ENABLED_ID, 0 }
-            };
-
-            PrefManager = new PreferenceManager(MOD_GUID);
-
-            PrefManager
-                .AddLabel("First Person View")
-                .AddSpacer()
-                .AddOption<int>
-                (
-                    FPV_ENABLED_ID, 
-                    0,
-                    new int[] { 0, 1 },
-                    new string[] { "Disabled", "Enabled" }
-                );*/
         }
 
         #region Logging
