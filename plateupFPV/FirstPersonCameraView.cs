@@ -343,7 +343,7 @@ namespace KitchenFirstPersonView
                 }
                 else
                 {
-                    moveAction.AddBinding("<Gamepad>/rightStick").WithProcessor("stickDeadzone(min=0.4,max=0.5)");
+                    moveAction.AddBinding("<Gamepad>/leftStick").WithProcessor("stickDeadzone(min=0.4,max=0.5)");
                     lookAction.AddBinding("<Gamepad>/rightStick")
                         .WithProcessor("stickDeadzone(min=0.125,max=0.925)")
                         .WithProcessor("scaleVector2(x=50,y=50)");
