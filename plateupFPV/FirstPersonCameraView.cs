@@ -25,16 +25,26 @@ namespace KitchenFirstPersonView
         public bool IsInitialised;
     }
 
+    public struct SPlayerToToggle : IComponentData 
+    {
+        public int PlayerToToggle;
+    }
+
     public class FirstPersonPlayerView : UpdatableObjectView<FirstPersonPlayerView.ViewData>, ISpecificViewResponse
     {
+
         public class UpdateView : ResponsiveViewSystemBase<ViewData, ResponseData>, IModSystem
         {
+            public static UpdateView Instance { get; private set; }
+
             EntityQuery Query;
             List<int> localInputSources;
 
             protected override void Initialise()
             {
                 base.Initialise();
+
+                Instance = this;
 
                 Query = GetEntityQuery(typeof(CLinkedView), typeof(CFirstPersonPlayer));
                 localInputSources = new List<int>();
@@ -66,46 +76,41 @@ namespace KitchenFirstPersonView
                     }
                 }*/
 
-                //bool isPaused = base.Time.IsPaused;
-
-                /*for (var i = 0; i < ents.Length; i++)
-                {
-                    var ent = ents[i];
-                    var playerComponent = playerComponents[i];
-                    var firstPersonPlayerComponent = firstPersonPlayerComponents[i];
-
-                    if (!firstPersonPlayerComponent.IsInitialised)
-                        break;
-                    if (playerComponent.InputSource == InputSourceIdentifier.Identifier && !localInputSources.Contains(playerComponent.InputSource))
-                    {
-                        localInputSources.Add(playerComponent.InputSource);
-                    }
-
-                    if (localInputSources.Count > 1)
-                    {
-                        firstPersonPlayerComponent.IsActive = false;
-                        Set(ent, firstPersonPlayerComponent);
-                    }
-                }*/
-
                 for (var i = 0; i < linkedViews.Length; i++)
                 {
+                    /*if (TryGetSingleton(out SPlayerToToggle sPlayerToToggle))
+                    {
+                        if (sPlayerToToggle.PlayerToToggle == playerComponents[i].ID)
+                        {
+                            var fppComponent = firstPersonPlayerComponents[i];
+
+                            fppComponent.IsActive = !fppComponent.IsActive;
+                            Set(ents[i], sPlayerToToggle);
+
+                            
+                            EntityManager.DestroyEntity(GetSingletonEntity<SPlayerToToggle>());
+                        }
+                    }*/
+
                     if (playerComponents[i].InputSource == InputSourceIdentifier.Identifier && !localInputSources.Contains(playerComponents[i].InputSource))
                     {
                         localInputSources.Add(playerComponents[i].InputSource);
                     }
 
+                    PreferenceInt fpvEnabledInt = Mod.PrefManager.GetPreference<PreferenceInt>(Mod.FPV_ENABLED_ID);
+                    bool isActive = fpvEnabledInt.Get() == 1;
+                    CFirstPersonPlayer cFirstPersonPlayer = firstPersonPlayerComponents[i];
+                    cFirstPersonPlayer.IsActive = isActive;
+                    Set(ents[i], cFirstPersonPlayer);
 
-                    bool is_active = false;
-                    if (inputDataComponent[i].State.Request == GameStateRequest.InLocalMenu)
-                    {
-                        is_active = false;
-                    }
-                    else
-                    {
-                        is_active = firstPersonPlayerComponents[i].IsActive;
-                    }
-                    SendUpdate(linkedViews[i], new ViewData { IsActive = is_active, IsInitialised = firstPersonPlayerComponents[i].IsInitialised, Source = playerComponents[i].InputSource, Speed = playerComponents[i].Speed, PlayerID = playerComponents[0].ID });
+                    SendUpdate(linkedViews[i], new ViewData { 
+                        IsActive = firstPersonPlayerComponents[i].IsActive, 
+                        IsInitialised = firstPersonPlayerComponents[i].IsInitialised, 
+                        Source = playerComponents[i].InputSource, 
+                        Speed = playerComponents[i].Speed, 
+                        PlayerID = playerComponents[0].ID, 
+                        IsInMenu = (inputDataComponent[i].State.Request == GameStateRequest.InLocalMenu) 
+                    });
                 }
 
                 foreach (CLinkedView view in linkedViews)
@@ -154,6 +159,17 @@ namespace KitchenFirstPersonView
                 }
                 return;
             }
+
+            /*public static void CreatePlayerToToggleSingleton(int playerID)
+            {
+                var sPlayerToToggle = new SPlayerToToggle()
+                {
+                    PlayerToToggle = playerID
+                };
+                Entity entity = Instance.Set(sPlayerToToggle);
+
+                Instance.Set<CDoNotPersist>(entity);
+            }*/
         }
 
         [MessagePackObject(false)]
@@ -164,6 +180,7 @@ namespace KitchenFirstPersonView
             [Key(2)] public bool IsActive;
             [Key(3)] public float Speed;
             [Key(4)] public int PlayerID;
+            [Key(5)] public bool IsInMenu;
 
             public IUpdatableObject GetRelevantSubview(IObjectView view)
             {
@@ -185,7 +202,7 @@ namespace KitchenFirstPersonView
 
             public bool IsChangedFrom(ViewData check)
             {
-                return IsActive != check.IsActive || IsInitialised != check.IsInitialised || Source != check.Source || Speed != check.Speed;
+                return IsActive != check.IsActive || IsInitialised != check.IsInitialised || Source != check.Source || Speed != check.Speed || IsInMenu != check.IsInMenu;
             }
         }
 
@@ -223,7 +240,7 @@ namespace KitchenFirstPersonView
             // Toggle Active
             if (toggleCameraKey.wasPressedThisFrame)
             {
-                if (Callback != null)
+                /*if (Callback != null)
                 {
                     Callback.Invoke(new ResponseData
                     {
@@ -235,7 +252,18 @@ namespace KitchenFirstPersonView
                 else
                 {
                     Mod.LogError("*** CALLBACK IS NULL ***");
+                }*/
+
+                PreferenceInt preferenceInt = Mod.PrefManager.GetPreference<PreferenceInt>(Mod.FPV_ENABLED_ID);
+                if (preferenceInt.Get() == 0)
+                {
+                    preferenceInt.Set(1);
                 }
+                else
+                {
+                    preferenceInt.Set(0);
+                }
+                Mod.PrefManager.Save();
             }
 
 
@@ -243,7 +271,7 @@ namespace KitchenFirstPersonView
             int playerModelVisibility = playerModelVisibilityPreference.Get();
 
 
-            if (!Data.IsActive)
+            if (!Data.IsActive || Data.IsInMenu)
             {
                 transform.Find(PLAYER_MODEL_PATH).gameObject.SetActive(true);
                 transform.Find(COSMETICS_PATH).gameObject.SetActive(true);
@@ -314,6 +342,8 @@ namespace KitchenFirstPersonView
         private InputAction moveAction;
         private float xRotation = 0f;
         private KeyControl toggleCameraKey = Keyboard.current.f5Key;
+
+        private static readonly int NightFade = Shader.PropertyToID("_NightFade");
 
         private const string PLAYER_MODEL_PATH = "MorphmanPlus/Body";
         private const string COSMETICS_PATH = "Cosmetics";
@@ -396,11 +426,10 @@ namespace KitchenFirstPersonView
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
 
-                //Vector3 desiredHoldPointPosition = new Vector3(0f, 0.65f, 0.55f);
                 Vector3 desiredHoldPointLocalPosition = new Vector3(0f, 0f, 0f);
                 transform.Find(ITEM_HOLDPOINT_PATH).localPosition = desiredHoldPointLocalPosition;
             }
-            else
+            if (!data.IsActive || data.IsInMenu)
             {
                 firstPersonCamera.gameObject.SetActive(false);
 
@@ -419,8 +448,6 @@ namespace KitchenFirstPersonView
 
                 Quaternion origLocalRot = Quaternion.identity;
                 transform.Find(ITEM_HOLDPOINT_PATH).localRotation = origLocalRot;
-
-                //TODO: Fix. I believe it doesn't return to proper position because in Update you are updating the Hold Points pos and rot, while here it is the item holdpoint.
             }
         }
 

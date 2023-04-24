@@ -21,19 +21,18 @@ namespace KitchenFirstPersonView
 
         public override void Setup(int player_id)
         {
-            AddButton("Toggle First Person", delegate (int i)
+            /*AddButton("Toggle First Person", delegate (int i)
             {
-                FirstPersonPlayerView[] playerViews = GameObject.FindObjectsOfType<FirstPersonPlayerView>();
-
-                foreach (var playerView in playerViews)
-                {
-                    if (playerView.Data.Source == player_id)
-                    {
-                        playerView.Data.IsActive = !playerView.Data.IsActive;
-                        break;
-                    }
-                }
-            }, 0, 1f, 0.2f);
+                FirstPersonPlayerView.UpdateView.CreatePlayerToToggleSingleton(player_id);
+            }, 0, 1f, 0.2f);*/
+            AddLabel("First Person Camera");
+            AddSelect<int>(FPVEnabledOption);
+            FPVEnabledOption.OnChanged += delegate (object _, int result)
+            {
+                PreferenceInt preferenceInt = Mod.PrefManager.GetPreference<PreferenceInt>(Mod.FPV_ENABLED_ID);
+                preferenceInt.Set(result);
+                Mod.PrefManager.Save();
+            };
 
             New<SpacerElement>();
 
@@ -92,6 +91,12 @@ namespace KitchenFirstPersonView
         private Option<int> VisiblePlayerModelOption = new Option<int>(
             new List<int> { 0, 1 },
             (int)Mod.PrefManager.Get<PreferenceInt>(Mod.PLAYER_MODEL_VISIBLE_ID),
+            new List<string> { "Disabled", "Enabled" }
+            );
+
+        private Option<int> FPVEnabledOption = new Option<int>(
+            new List<int> { 0, 1 },
+            (int)Mod.PrefManager.Get<PreferenceInt>(Mod.FPV_ENABLED_ID),
             new List<string> { "Disabled", "Enabled" }
             );
     }

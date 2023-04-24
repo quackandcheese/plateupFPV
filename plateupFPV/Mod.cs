@@ -40,6 +40,7 @@ namespace KitchenFirstPersonView
         internal static PreferenceFloat SensitivityPreference = new PreferenceFloat(SENSITIVITY_ID, 5.0f);
         internal static PreferenceInt FOVPreference = new PreferenceInt(FOV_ID, 80);
         internal static PreferenceInt PlayerModelVisibilityPreference = new PreferenceInt(PLAYER_MODEL_VISIBLE_ID, 0);
+        internal static PreferenceInt FPVEnabledPreference = new PreferenceInt(FPV_ENABLED_ID, 0);
 
         // Boolean constant whose value depends on whether you built with DEBUG or RELEASE mode, useful for testing
 #if DEBUG
@@ -75,6 +76,7 @@ namespace KitchenFirstPersonView
             PrefManager.RegisterPreference(SensitivityPreference);
             PrefManager.RegisterPreference(FOVPreference);
             PrefManager.RegisterPreference(PlayerModelVisibilityPreference);
+            PrefManager.RegisterPreference(FPVEnabledPreference);
 
             PrefManager.Load();
 

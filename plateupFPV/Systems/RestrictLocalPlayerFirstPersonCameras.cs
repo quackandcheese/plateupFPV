@@ -30,7 +30,7 @@ namespace KitchenFirstPersonView.Systems
             using var playerComponents = Query.ToComponentDataArray<CPlayer>(Allocator.Temp);
 
 
-            Mod.LogWarning("These are players that share InputSource with at least one other player!");
+            //Mod.LogWarning("These are players that share InputSource with at least one other player!");
             foreach (var playerItem in playerComponents
                 .Select((item, i) => new {
                     Index = i,
